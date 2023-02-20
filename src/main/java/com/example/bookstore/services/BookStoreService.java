@@ -1,91 +1,130 @@
 package com.example.bookstore.services;
 
-import com.example.bookstore.datautils.DataUtils;
 import com.example.bookstore.entities.Book;
 import com.example.bookstore.enums.Category;
 import com.example.bookstore.exceptions.BookAlreadyExistWithNameException;
 import com.example.bookstore.exceptions.InvalidBookIdException;
+import com.example.bookstore.exceptions.InvalidInputException;
 import com.example.bookstore.models.CreateBookRequest;
 import com.example.bookstore.models.SimpleResponse;
+import com.example.bookstore.repositories.BookStoreRepository;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
-import static com.example.bookstore.datautils.DataUtils.*;
+import static com.example.bookstore.constants.ApplicationConstants.BOOK_TITLE_UNIQUE_KEY;
+import static com.example.bookstore.exceptions.ErrorCodes.INVALID_DELETE_PAYLOAD;
 
 @Service
 public class BookStoreService {
 
-    public Book addBook(CreateBookRequest request) throws BookAlreadyExistWithNameException {
+    private final BookStoreRepository bookStoreRepository;
+
+    @Autowired
+    public BookStoreService(BookStoreRepository bookStoreRepository) {
+        this.bookStoreRepository = bookStoreRepository;
+    }
+
+    /**
+     * add book
+     *
+     * @param request request
+     * @return book
+     * @throws InvalidInputException invalid input exception
+     * @throws BookAlreadyExistWithNameException book already exist with name exception
+     */
+    public Book addBook(CreateBookRequest request) throws InvalidInputException, BookAlreadyExistWithNameException {
         Book book = new Book();
         BeanUtils.copyProperties(request, book);
-        book.setId(ID++);
-
-        if (BOOK_NAME_AND_BOOK_ID.containsKey(book.getTitle())) {
-            throw new BookAlreadyExistWithNameException(book.getTitle());
-        }
-
-        BOOK_NAME_AND_BOOK_ID.put(book.getTitle(), book.getId());
-
-        if (!CATEGORY_AND_BOOK_IDS.containsKey(book.getCategory())) {
-            CATEGORY_AND_BOOK_IDS.put(book.getCategory(), new HashSet<>());
-        }
-        CATEGORY_AND_BOOK_IDS.get(book.getCategory()).add(book.getId());
-
-        if (!AUTHOR_AND_BOOK_IDS.containsKey(book.getAuthor())) {
-            AUTHOR_AND_BOOK_IDS.put(book.getAuthor(), new HashSet<>());
-        }
-        AUTHOR_AND_BOOK_IDS.get(book.getAuthor()).add(book.getId());
-
-        BOOK_ID_AND_BOOK_DATA.put(book.getId(), book);
-        return book;
+        return this.persist(book);
     }
 
-    public SimpleResponse deleteBookById(Integer id) throws InvalidBookIdException {
-        if (!BOOK_ID_AND_BOOK_DATA.containsKey(id)) {
-            throw new InvalidBookIdException(id);
+    /**
+     * delete book by id
+     *
+     * @param id id
+     * @return simple response of success
+     */
+    public SimpleResponse deleteBookById(Integer id) {
+        try {
+            this.bookStoreRepository.deleteById(id);
+        } catch (Exception e) {
+            return new SimpleResponse(null, false, INVALID_DELETE_PAYLOAD);
         }
-
-        Book book = BOOK_ID_AND_BOOK_DATA.get(id);
-
-        BOOK_NAME_AND_BOOK_ID.remove(book.getTitle());
-        CATEGORY_AND_BOOK_IDS.get(book.getCategory()).remove(book.getId());
-        AUTHOR_AND_BOOK_IDS.get(book.getAuthor()).remove(book.getId());
-        BOOK_ID_AND_BOOK_DATA.remove(book.getId());
-
-        return new SimpleResponse(1, true);
+        return new SimpleResponse(null, true, null);
     }
 
+    /**
+     * get book by id
+     *
+     * @param id id
+     * @return book
+     * @throws InvalidBookIdException invalid book id exception
+     */
     public Book getBookById(Integer id) throws InvalidBookIdException {
-        if (!BOOK_ID_AND_BOOK_DATA.containsKey(id)) {
-            throw new InvalidBookIdException(id);
-        }
-
-        return BOOK_ID_AND_BOOK_DATA.get(id);
+        return this.bookStoreRepository.findById(id)
+                .orElseThrow(() -> new InvalidBookIdException(id));
     }
 
-    public List<Book> getBooksByCategory(Category category) {
-        Set<Integer> bookIds = CATEGORY_AND_BOOK_IDS.get(category);
-        if (CollectionUtils.isEmpty(bookIds)) {
-            return new LinkedList<>();
-        }
-
-        return bookIds.stream().map(BOOK_ID_AND_BOOK_DATA::get).collect(Collectors.toList());
+    /**
+     * get books by category with pagination
+     *
+     * @param category category
+     * @param pageable pageable
+     * @return pagination with books
+     */
+    public Page<Book> getBooksByCategory(Category category, Pageable pageable) {
+        return this.bookStoreRepository.findByCategory(category.name(), pageable);
     }
 
-    public List<Book> getBooksByAuthor(String author) {
-        Set<Integer> bookIds = AUTHOR_AND_BOOK_IDS.get(author);
-        if (CollectionUtils.isEmpty(bookIds)) {
-            return new LinkedList<>();
-        }
-
-        return bookIds.stream().map(BOOK_ID_AND_BOOK_DATA::get).collect(Collectors.toList());
+    /**
+     * get books by author
+     *
+     * @param author author name
+     * @param pageable pageable
+     * @return books with pageable
+     */
+    public Page<Book> getBooksByAuthor(String author, Pageable pageable) {
+        return this.bookStoreRepository.findByAuthor(author, pageable);
     }
 
-    public List<Book> getAllBooks() {
-        return new LinkedList<>(BOOK_ID_AND_BOOK_DATA.values());
+    /**
+     * get all books
+     *
+     * @param pageable pagebale
+     * @return all books with pageable
+     */
+    public Page<Book> getAllBooks(Pageable pageable) {
+        return this.bookStoreRepository.findAll(pageable);
+    }
+
+    /**
+     * persist book
+     *
+     * @param book book
+     * @return persisted book
+     * @throws BookAlreadyExistWithNameException book already exist with name exception
+     * @throws InvalidInputException invalid input exception
+     */
+    private Book persist(Book book) throws BookAlreadyExistWithNameException, InvalidInputException {
+        try {
+            return this.bookStoreRepository.save(book);
+        } catch (DataIntegrityViolationException dive) {
+            Throwable e = dive.getCause();
+            if (e instanceof ConstraintViolationException) {
+                String constraintName = ((ConstraintViolationException) e).getConstraintName();
+                if (constraintName.equals(BOOK_TITLE_UNIQUE_KEY)) {
+                    throw new BookAlreadyExistWithNameException(book.getTitle());
+                } else {
+                    throw new InvalidInputException();
+                }
+            } else {
+                throw dive;
+            }
+        }
     }
 }
