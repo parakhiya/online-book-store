@@ -44,7 +44,7 @@ curl --location --request DELETE 'localhost:8081/bookStore/1002'
 curl --location --request GET 'localhost:8081/bookStore/1002'
 ```
 
-5.Get all books 
+5. Get all books 
 ```
 curl --location --request GET 'localhost:8081/bookStore/all?page=0&size=1'
 ```
