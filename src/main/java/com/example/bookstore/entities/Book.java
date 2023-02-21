@@ -29,10 +29,12 @@ public class Book {
     @Column(name = "title")
     private String title;
 
+    //Multiple authors can write same book
     @Type(type = "string-array")
     @Column(name = "authors", columnDefinition = "text[]")
     private String[] authors;
 
+    //Book can have multiple categories
     @Type(type = "string-array")
     @Column(name = "categories", columnDefinition = "text[]")
     private Category[] categories;

@@ -8,5 +8,4 @@ import lombok.Data;
 public class SimpleResponse {
     private Integer count;
     private Boolean success;
-    private String message;
 }

@@ -3,7 +3,7 @@ package com.example.bookstore.controllers;
 import com.example.bookstore.entities.Book;
 import com.example.bookstore.enums.Category;
 import com.example.bookstore.exceptions.BookAlreadyExistWithNameException;
-import com.example.bookstore.exceptions.InvalidBookIdException;
+import com.example.bookstore.exceptions.BookNotPresentException;
 import com.example.bookstore.exceptions.InvalidInputException;
 import com.example.bookstore.models.CreateBookRequest;
 import com.example.bookstore.models.SimpleResponse;
@@ -34,7 +34,7 @@ public class BookStoreController {
      *
      * @param request request
      * @return book
-     * @throws InvalidInputException invalid input exception
+     * @throws InvalidInputException             invalid input exception
      * @throws BookAlreadyExistWithNameException book already exist with name exception
      */
     @PostMapping
@@ -58,10 +58,10 @@ public class BookStoreController {
      *
      * @param id id
      * @return book
-     * @throws InvalidBookIdException invalid book id exception
+     * @throws BookNotPresentException invalid book id exception
      */
     @GetMapping("/{id}")
-    public Book getBookById(@PathVariable Integer id) throws InvalidBookIdException {
+    public Book getBookById(@PathVariable Integer id) throws BookNotPresentException {
         return this.bookStoreService.getBookById(id);
     }
 
@@ -80,7 +80,7 @@ public class BookStoreController {
     /**
      * get books by author
      *
-     * @param author author name
+     * @param author   author name
      * @param pageable pageable
      * @return books with pageable
      */
